@@ -1,6 +1,6 @@
-# Servora
+# Cravon
 
-Servora is now arranged as a proper full-stack project:
+Cravon is arranged as a proper full-stack project:
 
 - `backend/` - Django, SQLite, models, admin, and JSON API routes
 - `frontend/` - React + Vite app for the customer and admin interface

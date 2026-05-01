@@ -1,6 +1,6 @@
 import { ChefHat, ClipboardList, LogOut, ShoppingCart, Store, UserRound } from "lucide-react";
 
-export function Sidebar({ user, cartCount, onSignOut }) {
+export function Sidebar({ user, activeView, cartCount, onNavigate, onSignOut }) {
   const isAdmin = user?.role === "admin";
   const isCustomer = user?.role === "customer";
 
@@ -12,9 +12,11 @@ export function Sidebar({ user, cartCount, onSignOut }) {
       </div>
 
       <nav className="navStack" aria-label="Main navigation">
-        <button className="nav active"><Store size={18} /> Restaurants</button>
-        {isCustomer && <button className="nav"><ShoppingCart size={18} /> Cart ({cartCount})</button>}
-        {isAdmin && <button className="nav"><ClipboardList size={18} /> Admin</button>}
+        <button className={`nav ${activeView === "restaurants" ? "active" : ""}`} onClick={() => onNavigate("restaurants")}><Store size={18} /> Restaurants</button>
+        {isCustomer && <button className={`nav ${activeView === "cart" ? "active" : ""}`} onClick={() => onNavigate("cart")}><ShoppingCart size={18} /> Cart ({cartCount})</button>}
+        {isCustomer && <button className={`nav ${activeView === "orders" ? "active" : ""}`} onClick={() => onNavigate("orders")}><ClipboardList size={18} /> My orders</button>}
+        {isAdmin && <button className={`nav ${activeView === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><ClipboardList size={18} /> Admin</button>}
+        {isAdmin && <button className={`nav ${activeView === "orders" ? "active" : ""}`} onClick={() => onNavigate("orders")}><ShoppingCart size={18} /> Orders</button>}
       </nav>
 
       <div className="account">

@@ -500,6 +500,7 @@ def payment_success(request):
 
 import razorpay
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -562,11 +563,35 @@ def _menu_item_data(request, item):
     }
 
 
+def _order_data(order):
+    return {
+        "id": order.id,
+        "customer": order.customer.username,
+        "restaurant": order.restaurant.name,
+        "subtotal": float(order.subtotal),
+        "delivery_fee": float(order.delivery_fee),
+        "tax_amount": float(order.tax_amount),
+        "total_price": float(order.total_price),
+        "delivery_address": order.delivery_address,
+        "delivery_phone": order.delivery_phone,
+        "delivery_instructions": order.delivery_instructions,
+        "payment_status": order.payment_status,
+        "order_status": order.order_status,
+        "razorpay_order_id": order.razorpay_order_id or "",
+        "razorpay_payment_id": order.razorpay_payment_id or "",
+        "created_at": order.created_at.isoformat(),
+    }
+
+
 def _current_user(request):
     if request.session.get("admin"):
         return {"username": request.session["admin"], "role": "admin"}
     if request.session.get("username"):
-        return {"username": request.session["username"], "role": "customer"}
+        return {
+            "id": request.session.get("customer_id"),
+            "username": request.session["username"],
+            "role": "customer",
+        }
     return None
 
 
@@ -592,6 +617,65 @@ def _cart_payload(request):
     return {"items": items, "total_price": total}
 
 
+def _money(value):
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _price_breakdown(cart):
+    subtotal = _money(cart["total_price"])
+    delivery_fee = Decimal("39.00") if subtotal > 0 else Decimal("0.00")
+    tax_amount = (subtotal * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    total_price = subtotal + delivery_fee + tax_amount
+    return {
+        "subtotal": subtotal,
+        "delivery_fee": delivery_fee,
+        "tax_amount": tax_amount,
+        "total_price": total_price,
+    }
+
+
+def _delivery_details(request, customer):
+    data = _json_body(request) if request.body else {}
+    address = (data.get("delivery_address") or customer.address or "").strip()
+    phone = (data.get("delivery_phone") or customer.mobile or "").strip()
+    instructions = (data.get("delivery_instructions") or "").strip()
+
+    if not address:
+        return None, JsonResponse({"error": "Delivery address is required"}, status=400)
+    if not phone:
+        return None, JsonResponse({"error": "Delivery phone is required"}, status=400)
+
+    return {
+        "delivery_address": address,
+        "delivery_phone": phone,
+        "delivery_instructions": instructions,
+    }, None
+
+
+def _customer_username(request):
+    username = request.session.get("username")
+    if not username:
+        return None
+    return username
+
+
+def _current_customer(request):
+    customer_id = request.session.get("customer_id")
+    if customer_id:
+        customer = Customer.objects.filter(id=customer_id).first()
+        if customer:
+            return customer
+
+    username = request.session.get("username")
+    if not username:
+        return None
+    return Customer.objects.filter(username=username).order_by("-id").first()
+
+
+def _cart_response(request):
+    return JsonResponse({"cart": _cart_payload(request)})
+
+
 @csrf_exempt
 def api_signin(request):
     if request.method != "POST":
@@ -611,8 +695,9 @@ def api_signin(request):
         return JsonResponse({"error": "Invalid credentials"}, status=400)
 
     request.session["username"] = user.username
+    request.session["customer_id"] = user.id
     request.session.pop("admin", None)
-    return JsonResponse({"user": {"username": user.username, "role": "customer"}})
+    return JsonResponse({"user": {"id": user.id, "username": user.username, "role": "customer"}})
 
 
 @csrf_exempt
@@ -625,8 +710,8 @@ def api_signup(request):
     if any(not data.get(field) for field in required):
         return JsonResponse({"error": "All fields are required"}, status=400)
 
-    if Customer.objects.filter(username=data["username"], password=data["password"]).exists():
-        return JsonResponse({"error": "Account already exists"}, status=400)
+    if Customer.objects.filter(username=data["username"]).exists():
+        return JsonResponse({"error": "Username already exists"}, status=400)
 
     Customer.objects.create(
         username=data["username"],
@@ -658,6 +743,43 @@ def api_dashboard(request):
         "total_revenue": Order.objects.aggregate(total=Sum("total_price"))["total"] or 0,
         "todays_revenue": Order.objects.filter(created_at__date=today).aggregate(total=Sum("total_price"))["total"] or 0,
     })
+
+
+def api_orders(request):
+    user = _current_user(request)
+    if not user:
+        return JsonResponse({"error": "Please sign in"}, status=401)
+
+    if user["role"] == "admin":
+        orders = Order.objects.select_related("customer", "restaurant").order_by("-created_at")
+    else:
+        customer = _current_customer(request)
+        if not customer:
+            return JsonResponse({"error": "Please sign in again"}, status=401)
+        orders = Order.objects.select_related("customer", "restaurant").filter(customer=customer).order_by("-created_at")
+
+    return JsonResponse({"orders": [_order_data(order) for order in orders]})
+
+
+@csrf_exempt
+def api_order_status(request, id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    user = _current_user(request)
+    if not user or user["role"] != "admin":
+        return JsonResponse({"error": "Admin access required"}, status=403)
+
+    data = _json_body(request)
+    status = data.get("order_status")
+    allowed = {Order.STATUS_PLACED, Order.STATUS_PREPARING, Order.STATUS_DELIVERED}
+    if status not in allowed:
+        return JsonResponse({"error": "Invalid order status"}, status=400)
+
+    order = get_object_or_404(Order.objects.select_related("customer", "restaurant"), id=id)
+    order.order_status = status
+    order.save(update_fields=["order_status"])
+    return JsonResponse({"order": _order_data(order)})
 
 
 @csrf_exempt
@@ -756,15 +878,21 @@ def api_menu_item_detail(request, id):
 
 
 def api_cart(request):
-    if not request.session.get("username"):
+    if request.method != "GET":
+        return JsonResponse({"error": "GET required"}, status=405)
+
+    if not _customer_username(request):
         return JsonResponse({"error": "Please sign in as customer"}, status=401)
-    return JsonResponse({"cart": _cart_payload(request)})
+    return _cart_response(request)
 
 
 @csrf_exempt
 def api_cart_add(request, id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
     item = get_object_or_404(MenuItem, id=id)
-    username = request.session.get("username")
+    username = _customer_username(request)
     if not username:
         return JsonResponse({"error": "Please sign in as customer"}, status=401)
 
@@ -779,35 +907,53 @@ def api_cart_add(request, id):
     cart[str(id)]["quantity"] += 1
     request.session[cart_key] = cart
     request.session.modified = True
-    return JsonResponse({"cart": _cart_payload(request)})
+    return _cart_response(request)
 
 
 @csrf_exempt
 def api_cart_remove(request, id):
-    username = request.session.get("username")
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    username = _customer_username(request)
+    if not username:
+        return JsonResponse({"error": "Please sign in as customer"}, status=401)
+
     cart_key = f"cart_{username}"
     cart = request.session.get(cart_key, {})
     cart.pop(str(id), None)
     request.session[cart_key] = cart
     request.session.modified = True
-    return JsonResponse({"cart": _cart_payload(request)})
+    return _cart_response(request)
 
 
 @csrf_exempt
 def api_cart_increase(request, id):
-    username = request.session.get("username")
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    username = _customer_username(request)
+    if not username:
+        return JsonResponse({"error": "Please sign in as customer"}, status=401)
+
     cart_key = f"cart_{username}"
     cart = request.session.get(cart_key, {})
     if str(id) in cart:
         cart[str(id)]["quantity"] += 1
     request.session[cart_key] = cart
     request.session.modified = True
-    return JsonResponse({"cart": _cart_payload(request)})
+    return _cart_response(request)
 
 
 @csrf_exempt
 def api_cart_decrease(request, id):
-    username = request.session.get("username")
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    username = _customer_username(request)
+    if not username:
+        return JsonResponse({"error": "Please sign in as customer"}, status=401)
+
     cart_key = f"cart_{username}"
     cart = request.session.get(cart_key, {})
     if str(id) in cart:
@@ -816,12 +962,15 @@ def api_cart_decrease(request, id):
             cart.pop(str(id), None)
     request.session[cart_key] = cart
     request.session.modified = True
-    return JsonResponse({"cart": _cart_payload(request)})
+    return _cart_response(request)
 
 
 @csrf_exempt
 def api_checkout(request):
-    username = request.session.get("username")
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    username = _customer_username(request)
     if not username:
         return JsonResponse({"error": "Please sign in as customer"}, status=401)
 
@@ -829,20 +978,144 @@ def api_checkout(request):
     if not cart["items"]:
         return JsonResponse({"error": "Cart is empty"}, status=400)
 
-    customer = Customer.objects.get(username=username)
-    restaurant = Restaurant.objects.get(id=cart["items"][0]["restaurant_id"])
-    order = Order.objects.create(customer=customer, restaurant=restaurant, total_price=cart["total_price"])
+    customer = _current_customer(request)
+    if not customer:
+        return JsonResponse({"error": "Please sign in again before checkout"}, status=401)
+
+    restaurant_id = cart["items"][0].get("restaurant_id")
+    if not restaurant_id:
+        return JsonResponse({"error": "Cart has an invalid item. Please remove it and try again."}, status=400)
+
+    restaurant = Restaurant.objects.filter(id=restaurant_id).first()
+    if not restaurant:
+        return JsonResponse({"error": "This restaurant is no longer available. Please clear your cart and try again."}, status=400)
+    delivery, error_response = _delivery_details(request, customer)
+    if error_response:
+        return error_response
+    pricing = _price_breakdown(cart)
+    order = Order.objects.create(
+        customer=customer,
+        restaurant=restaurant,
+        subtotal=pricing["subtotal"],
+        delivery_fee=pricing["delivery_fee"],
+        tax_amount=pricing["tax_amount"],
+        total_price=pricing["total_price"],
+        **delivery,
+        payment_status=Order.PAYMENT_PENDING,
+        order_status=Order.STATUS_PLACED,
+    )
     request.session[f"cart_{username}"] = {}
     request.session.modified = True
 
+    return JsonResponse({"order": _order_data(order)}, status=201)
+
+
+@csrf_exempt
+def api_payment_create(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    username = _customer_username(request)
+    if not username:
+        return JsonResponse({"error": "Please sign in as customer"}, status=401)
+
+    cart = _cart_payload(request)
+    if not cart["items"]:
+        return JsonResponse({"error": "Cart is empty"}, status=400)
+
+    customer = _current_customer(request)
+    if not customer:
+        return JsonResponse({"error": "Please sign in again before checkout"}, status=401)
+
+    restaurant_id = cart["items"][0].get("restaurant_id")
+    restaurant = Restaurant.objects.filter(id=restaurant_id).first()
+    if not restaurant:
+        return JsonResponse({"error": "This restaurant is no longer available. Please clear your cart and try again."}, status=400)
+    delivery, error_response = _delivery_details(request, customer)
+    if error_response:
+        return error_response
+    pricing = _price_breakdown(cart)
+
+    order = Order.objects.create(
+        customer=customer,
+        restaurant=restaurant,
+        subtotal=pricing["subtotal"],
+        delivery_fee=pricing["delivery_fee"],
+        tax_amount=pricing["tax_amount"],
+        total_price=pricing["total_price"],
+        **delivery,
+        payment_status=Order.PAYMENT_PENDING,
+        order_status=Order.STATUS_PLACED,
+    )
+
+    amount = int(pricing["total_price"] * 100)
+    try:
+        client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+        payment = client.order.create({
+            "amount": amount,
+            "currency": "INR",
+            "payment_capture": "1",
+            "notes": {"order_id": str(order.id), "customer": customer.username},
+        })
+        order.razorpay_order_id = payment["id"]
+        order.save(update_fields=["razorpay_order_id"])
+    except Exception as error:
+        order.delete()
+        return JsonResponse({"error": f"Unable to start Razorpay payment: {error}"}, status=502)
+
     return JsonResponse({
-        "order": {
-            "id": order.id,
-            "customer": customer.username,
-            "restaurant": restaurant.name,
-            "total_price": float(order.total_price),
-            "created_at": order.created_at.isoformat(),
-        }
+        "key": settings.RAZORPAY_KEY_ID,
+        "payment": payment,
+        "order": _order_data(order),
+        "customer": {
+            "name": customer.username,
+            "email": customer.email,
+            "contact": customer.mobile,
+            "address": customer.address,
+        },
     }, status=201)
+
+
+@csrf_exempt
+def api_payment_verify(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    username = _customer_username(request)
+    if not username:
+        return JsonResponse({"error": "Please sign in as customer"}, status=401)
+
+    data = _json_body(request)
+    required = ["order_id", "razorpay_order_id", "razorpay_payment_id", "razorpay_signature"]
+    if any(not data.get(field) for field in required):
+        return JsonResponse({"error": "Missing payment verification details"}, status=400)
+
+    customer = _current_customer(request)
+    order = Order.objects.filter(id=data["order_id"], customer=customer).first()
+    if not order:
+        return JsonResponse({"error": "Order not found"}, status=404)
+
+    params = {
+        "razorpay_order_id": data["razorpay_order_id"],
+        "razorpay_payment_id": data["razorpay_payment_id"],
+        "razorpay_signature": data["razorpay_signature"],
+    }
+
+    try:
+        client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+        client.utility.verify_payment_signature(params)
+    except Exception:
+        order.payment_status = Order.PAYMENT_FAILED
+        order.save(update_fields=["payment_status"])
+        return JsonResponse({"error": "Payment verification failed"}, status=400)
+
+    order.payment_status = Order.PAYMENT_PAID
+    order.razorpay_order_id = data["razorpay_order_id"]
+    order.razorpay_payment_id = data["razorpay_payment_id"]
+    order.save(update_fields=["payment_status", "razorpay_order_id", "razorpay_payment_id"])
+    request.session[f"cart_{username}"] = {}
+    request.session.modified = True
+
+    return JsonResponse({"order": _order_data(order)})
 
 

@@ -40,9 +40,27 @@ class Restaurant(models.Model):
 # orders for admin panel UI
 
 class Order(models.Model):
+    PAYMENT_PENDING = "pending"
+    PAYMENT_PAID = "paid"
+    PAYMENT_FAILED = "failed"
+
+    STATUS_PLACED = "placed"
+    STATUS_PREPARING = "preparing"
+    STATUS_DELIVERED = "delivered"
+
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE)
     restaurant = models.ForeignKey('Restaurant', on_delete=models.CASCADE)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    delivery_address = models.CharField(max_length=200, blank=True)
+    delivery_phone = models.CharField(max_length=15, blank=True)
+    delivery_instructions = models.CharField(max_length=200, blank=True)
+    payment_status = models.CharField(max_length=20, default=PAYMENT_PENDING)
+    order_status = models.CharField(max_length=20, default=STATUS_PLACED)
+    razorpay_order_id = models.CharField(max_length=120, blank=True, null=True)
+    razorpay_payment_id = models.CharField(max_length=120, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -4,9 +4,9 @@ export function Header({ query, onQueryChange, user }) {
   return (
     <header className="hero">
       <div>
-        <span className="eyebrow">Fast cravings, neatly managed</span>
+        <span className="eyebrow">Restaurant ordering platform</span>
         <h1>Cravon</h1>
-        <p>Browse restaurants, build a cart, and manage menus from one smooth React dashboard.</p>
+        <p>Discover restaurants, manage your cart, pay through checkout, and track every order from a structured workspace.</p>
       </div>
       <label className="searchBox">
         <Search size={18} />

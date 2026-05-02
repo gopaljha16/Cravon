@@ -706,19 +706,24 @@ def api_signup(request):
         return JsonResponse({"error": "POST required"}, status=405)
 
     data = _json_body(request)
-    required = ["username", "email", "password", "mobile", "address"]
-    if any(not data.get(field) for field in required):
-        return JsonResponse({"error": "All fields are required"}, status=400)
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    mobile = data.get("mobile", "").strip()
+    address = data.get("address", "").strip()
 
-    if Customer.objects.filter(username=data["username"]).exists():
-        return JsonResponse({"error": "Username already exists"}, status=400)
+    if not all([username, email, password, mobile, address]):
+        return JsonResponse({"error": "All fields (Username, Email, Password, Mobile, Address) are required"}, status=400)
+
+    if Customer.objects.filter(username=username).exists():
+        return JsonResponse({"error": "This username is already taken. Please choose another one."}, status=400)
 
     Customer.objects.create(
-        username=data["username"],
-        email=data["email"],
-        password=data["password"],
-        mobile=data["mobile"],
-        address=data["address"],
+        username=username,
+        email=email,
+        password=password,
+        mobile=mobile,
+        address=address,
     )
     return JsonResponse({"message": "Account created"})
 

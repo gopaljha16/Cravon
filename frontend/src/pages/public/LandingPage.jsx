@@ -90,33 +90,7 @@ export function LandingPage() {
             </button>
 
             {/* Live Search Suggestions */}
-            {isSearchFocused && searchQuery && (
-              <div className="absolute top-full left-0 right-0 mt-4 bg-white rounded-[2.5rem] shadow-2xl border border-black/5 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="p-5 border-b border-gray-50 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Discovery</span>
-                </div>
-                {filteredSearch.length === 0 ? (
-                  <div className="p-10 text-center text-gray-400 italic font-medium">No results for "{searchQuery}"</div>
-                ) : (
-                  filteredSearch.map(r => (
-                    <button 
-                      key={r.id} 
-                      onClick={() => navigate(`/explore?restaurant=${r.id}`)}
-                      className="w-full flex items-center gap-5 p-5 hover:bg-[#f5f2eb] transition-colors text-left group"
-                    >
-                      <img src={r.image} className="w-14 h-14 rounded-2xl object-cover shadow-sm" alt={r.name} />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-900 group-hover:text-[#2d4a36] transition-colors text-lg">{r.name}</h4>
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{r.cuisine}</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[#d4a373] font-black text-sm">
-                        {r.rating} <Star size={14} fill="#d4a373" />
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
+            
           </div>
         </div>
       </section>

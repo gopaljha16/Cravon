@@ -3,6 +3,8 @@
 import os
 import sys
 
+# Increase recursion depth for Djongo/sqlparse compatibility
+sys.setrecursionlimit(5000)
 
 def main():
     """Run administrative tasks."""

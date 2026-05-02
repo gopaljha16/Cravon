@@ -1,22 +1,28 @@
-import { Search } from "lucide-react";
+import React from "react";
+import { Search, UserCircle } from "lucide-react";
 
 export function Header({ query, onQueryChange, user }) {
   return (
-    <header className="hero">
-      <div>
-        <span className="eyebrow">Restaurant ordering platform</span>
-        <h1>Cravon</h1>
-        <p>Discover restaurants, manage your cart, pay through checkout, and track every order from a structured workspace.</p>
-      </div>
-      <label className="searchBox">
-        <Search size={18} />
+    <header className="mainHeader">
+      <div className="searchBox">
+        <Search size={20} className="muted" />
         <input
-          placeholder="Search restaurants or cuisines"
+          type="text"
+          placeholder="Search for restaurants, cuisines, or dishes..."
           value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
+          onChange={(e) => onQueryChange(e.target.value)}
         />
-      </label>
-      {user?.role === "admin" && <span className="rolePill">Admin workspace</span>}
+      </div>
+      
+      <div className="userProfile">
+        <div className="profileInfo">
+          <span>{user?.username || "Guest"}</span>
+          <small>{user?.role || "Visitor"}</small>
+        </div>
+        <div className="profileAvatar">
+          <UserCircle size={32} />
+        </div>
+      </div>
     </header>
   );
 }

@@ -40,12 +40,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "delivery",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -77,9 +80,13 @@ WSGI_APPLICATION = "cravon.wsgi.application"
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+    'default': {
+        'ENGINE': 'djongo',
+        'NAME': 'Cravon',
+        'ENFORCE_SCHEMA': False,
+        'CLIENT': {
+            'host': config('MONGODB_URI'),
+        }
     }
 }
 
@@ -127,3 +134,16 @@ MEDIA_ROOT = BASE_DIR / "menu_images"
 # Razorpay Test Keys
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='rzp_test_SJ9tWWDozsYE7u')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='uEE5Oi2kiloK3O3C2U0o759g')
+
+# Production Settings
+CORS_ALLOW_ALL_ORIGINS = True  # In real production, specify the frontend domain
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://*.vercel.app",
+    "https://servora.vercel.app",
+]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

@@ -568,10 +568,10 @@ def _order_data(order):
         "id": order.id,
         "customer": order.customer.username,
         "restaurant": order.restaurant.name,
-        "subtotal": float(order.subtotal),
-        "delivery_fee": float(order.delivery_fee),
-        "tax_amount": float(order.tax_amount),
-        "total_price": float(order.total_price),
+        "subtotal": float(str(order.subtotal)),
+        "delivery_fee": float(str(order.delivery_fee)),
+        "tax_amount": float(str(order.tax_amount)),
+        "total_price": float(str(order.total_price)),
         "delivery_address": order.delivery_address,
         "delivery_phone": order.delivery_phone,
         "delivery_instructions": order.delivery_instructions,
@@ -734,14 +734,23 @@ def api_me(request):
 
 
 def api_dashboard(request):
-    today = timezone.now().date()
+    from datetime import timedelta
+    now = timezone.now()
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    all_orders = Order.objects.all()
+    todays_orders = Order.objects.filter(created_at__gte=start_of_day)
+
+    total_rev = sum(float(str(order.total_price)) for order in all_orders)
+    todays_rev = sum(float(str(order.total_price)) for order in todays_orders)
+
     return JsonResponse({
         "total_users": Customer.objects.count(),
         "active_users": Customer.objects.count(),
         "total_restaurants": Restaurant.objects.count(),
-        "total_orders": Order.objects.count(),
-        "total_revenue": Order.objects.aggregate(total=Sum("total_price"))["total"] or 0,
-        "todays_revenue": Order.objects.filter(created_at__date=today).aggregate(total=Sum("total_price"))["total"] or 0,
+        "total_orders": all_orders.count(),
+        "total_revenue": total_rev,
+        "todays_revenue": todays_rev,
     })
 
 
@@ -898,6 +907,16 @@ def api_cart_add(request, id):
 
     cart_key = f"cart_{username}"
     cart = request.session.get(cart_key, {})
+
+    # 🔹 Check if adding from a different restaurant
+    if cart:
+        first_item = next(iter(cart.values()))
+        if first_item.get("restaurant_id") != item.restaurant.id:
+            # Option A: Error out
+            # return JsonResponse({"error": "You can only order from one restaurant at a time. Clear your cart first."}, status=400)
+            # Option B: Clear cart and add new (better UX)
+            cart = {}
+
     cart.setdefault(str(id), {
         "name": item.name,
         "price": float(item.price),

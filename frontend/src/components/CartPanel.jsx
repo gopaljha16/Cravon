@@ -1,28 +1,61 @@
-import { Loader2, Minus, Plus, ShoppingCart, Trash2, Utensils } from "lucide-react";
+import React from "react";
+import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 
 export function CartPanel({ cart, isBusy, onUpdateCart, onCheckout }) {
-  return (
-    <section className="cart">
-      <h2><ShoppingCart size={20} /> Cart</h2>
-      {cart.items.length === 0 && <p className="muted">Your cart is empty.</p>}
-      {cart.items.map((item) => (
-        <div className="cartRow" key={item.id}>
-          <span><b>{item.name}</b><small>Rs {item.subtotal}</small></span>
-          <div>
-            <button disabled={isBusy} onClick={() => onUpdateCart(`/cart/decrease/${item.id}/`)} title="Decrease"><Minus size={14} /></button>
-            <strong>{item.quantity}</strong>
-            <button disabled={isBusy} onClick={() => onUpdateCart(`/cart/increase/${item.id}/`)} title="Increase"><Plus size={14} /></button>
-            <button disabled={isBusy} onClick={() => onUpdateCart(`/cart/remove/${item.id}/`)} title="Remove"><Trash2 size={14} /></button>
-          </div>
+  if (cart.items.length === 0) {
+    return (
+      <div className="panel cart empty">
+        <div className="emptyContent">
+          <ShoppingCart size={40} className="muted" />
+          <p>Your cart is empty</p>
+          <small>Add some delicious food to get started!</small>
         </div>
-      ))}
-      <footer>
-        <b>Total: Rs {cart.total_price}</b>
-        <button className="primary" disabled={!cart.items.length || isBusy} onClick={onCheckout}>
-          {isBusy ? <Loader2 className="spin" size={16} /> : <Utensils size={16} />}
-          {isBusy ? "Processing" : "Checkout"}
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel cart">
+      <div className="panelHead">
+        <h2>Your Cart</h2>
+        <span className="cartCount">{cart.items.length}</span>
+      </div>
+      
+      <div className="cartItems">
+        {cart.items.map((item) => (
+          <div key={item.id} className="cartRow">
+            <div className="itemMain">
+              <b>{item.name}</b>
+              <p>₹{item.price} x {item.quantity}</p>
+            </div>
+            <div className="qtyControls">
+              <button 
+                onClick={() => onUpdateCart(`/cart/remove/${item.id}/`)}
+                disabled={isBusy}
+              >
+                <Minus size={14} />
+              </button>
+              <span>{item.quantity}</span>
+              <button 
+                onClick={() => onUpdateCart(`/cart/add/${item.id}/`)}
+                disabled={isBusy}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <footer className="cartFooter">
+        <div className="totalLine">
+          <span>Subtotal</span>
+          <b>₹{cart.total_price}</b>
+        </div>
+        <button className="primary fullWidth" onClick={onCheckout} disabled={isBusy}>
+          Checkout Now
         </button>
       </footer>
-    </section>
+    </div>
   );
 }

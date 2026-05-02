@@ -2,15 +2,19 @@ from django.db import models
 
 
 
+from django.db import models
+
+
+
 # Create your models here.
 
 #for sign up 
 class Customer(models.Model):
     username = models.CharField(max_length=20)
     password = models.CharField(max_length=20)
-    email = models.CharField(max_length=25)
-    mobile = models.CharField(max_length=10)
-    address = models.CharField(max_length=50)
+    email = models.CharField(max_length=255)
+    mobile = models.CharField(max_length=15)
+    address = models.CharField(max_length=500)
 
     
 
@@ -77,3 +81,18 @@ class MenuItem(models.Model):
     def __str__(self):
         return self.name
 
+class Review(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE)
+    rating = models.IntegerField(default=5)
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.customer.username}'s review for {self.restaurant.name}"
+
+# Coupon-related logic placeholder
+class Coupon(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    discount = models.DecimalField(max_digits=5, decimal_places=2)
+    active = models.BooleanField(default=True)

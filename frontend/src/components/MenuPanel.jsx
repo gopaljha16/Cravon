@@ -1,4 +1,5 @@
-import { Plus, Trash2 } from "lucide-react";
+import React from "react";
+import { Plus, Trash2, Utensils } from "lucide-react";
 import { fallbackFood } from "../api";
 
 export function MenuPanel({
@@ -10,45 +11,88 @@ export function MenuPanel({
   onSaveMenuItem,
   onDeleteMenuItem,
   onDeleteRestaurant,
-  onAddToCart
+  onAddToCart,
 }) {
-  return (
-    <section className="menu">
-      <div className="sectionHead">
-        <div>
-          <span className="eyebrow">Menu board</span>
-          <h2>{selected ? selected.name : "Choose a restaurant"}</h2>
+  if (!selected) {
+    return (
+      <div className="panel menu empty">
+        <div className="emptyContent">
+          <Utensils size={48} />
+          <p>Select a restaurant to view its menu</p>
         </div>
-        {isAdmin && selected && <button className="danger" onClick={() => onDeleteRestaurant(selected.id)}><Trash2 size={16} /> Delete restaurant</button>}
       </div>
+    );
+  }
 
-      {isAdmin && selected && (
-        <form className="toolbar compact" onSubmit={onSaveMenuItem}>
-          <input placeholder="Item name" value={menuForm.name} onChange={(e) => onMenuFormChange({ ...menuForm, name: e.target.value })} />
-          <input placeholder="Description" value={menuForm.description} onChange={(e) => onMenuFormChange({ ...menuForm, description: e.target.value })} />
-          <input placeholder="Price" type="number" value={menuForm.price} onChange={(e) => onMenuFormChange({ ...menuForm, price: e.target.value })} />
-          <input placeholder="Image URL" value={menuForm.image_url} onChange={(e) => onMenuFormChange({ ...menuForm, image_url: e.target.value })} />
-          <button className="primary"><Plus size={16} /> Add item</button>
-        </form>
-      )}
+  return (
+    <div className="panel menu">
+      <div className="panelHead">
+        <div>
+          <span className="eyebrow">{selected.cuisine}</span>
+          <h2>{selected.name}</h2>
+        </div>
+        {isAdmin && (
+          <button className="danger" onClick={() => onDeleteRestaurant(selected.id)}>
+            <Trash2 size={16} /> Delete Restaurant
+          </button>
+        )}
+      </div>
 
       <div className="cards">
         {menu.map((item) => (
-          <article className="card" key={item.id}>
-            <img src={item.image || fallbackFood} alt="" />
+          <article key={item.id} className="card foodCard">
+            <img src={item.image_url || fallbackFood} alt={item.name} />
             <div className="cardBody">
               <h3>{item.name}</h3>
-              <p>{item.description || "Freshly prepared and ready to serve."}</p>
-              <b>Rs {item.price}</b>
+              <p>{item.description}</p>
+              <div className="cardFooter">
+                <span className="priceTag">₹{item.price}</span>
+                <button className="primary iconOnly" onClick={() => onAddToCart(item)}>
+                  <Plus size={20} />
+                </button>
+              </div>
             </div>
-            {isAdmin ? (
-              <button className="danger iconOnly" onClick={() => onDeleteMenuItem(item.id)} title="Delete item"><Trash2 size={17} /></button>
-            ) : (
-              <button className="primary iconOnly" onClick={() => onAddToCart(item)} title="Add to cart"><Plus size={17} /></button>
+            {isAdmin && (
+              <button className="danger deleteBadge" onClick={() => onDeleteMenuItem(item.id)}>
+                <Trash2 size={14} />
+              </button>
             )}
           </article>
         ))}
       </div>
-    </section>
+
+      {isAdmin && (
+        <form className="addItemForm" onSubmit={onSaveMenuItem}>
+          <h3>Add New Menu Item</h3>
+          <div className="formGrid">
+            <input
+              placeholder="Food Name"
+              value={menuForm.name}
+              onChange={(e) => onMenuFormChange({ ...menuForm, name: e.target.value })}
+              required
+            />
+            <input
+              placeholder="Price (₹)"
+              type="number"
+              value={menuForm.price}
+              onChange={(e) => onMenuFormChange({ ...menuForm, price: e.target.value })}
+              required
+            />
+            <input
+              placeholder="Image URL"
+              value={menuForm.image_url}
+              onChange={(e) => onMenuFormChange({ ...menuForm, image_url: e.target.value })}
+            />
+            <input
+              placeholder="Description"
+              className="fullWidth"
+              value={menuForm.description}
+              onChange={(e) => onMenuFormChange({ ...menuForm, description: e.target.value })}
+            />
+          </div>
+          <button className="primary" type="submit">Add Item</button>
+        </form>
+      )}
+    </div>
   );
 }

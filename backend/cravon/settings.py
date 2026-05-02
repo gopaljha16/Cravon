@@ -28,7 +28,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-8xl68y87b8yd$bh*!%h&2
 DEBUG_VALUE = str(config('DEBUG', default='False')).lower()
 DEBUG = DEBUG_VALUE in ('1', 'true', 'yes', 'on', 'debug', 'development')
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='cravon-avls.onrender.com,localhost,127.0.0.1,*', cast=Csv())
 
 
 # Application definition

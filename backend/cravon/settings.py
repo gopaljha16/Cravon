@@ -142,7 +142,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://*.vercel.app",
-    "https://servora.vercel.app",
+    "https://cravon-delta.vercel.app",
 ]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
